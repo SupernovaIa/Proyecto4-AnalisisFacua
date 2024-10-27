@@ -1,19 +1,21 @@
-import pandas as pd
-from bs4 import BeautifulSoup
-import requests
-from tqdm import tqdm
-import json
 import os
+import json
 import dotenv
+import requests
+import numpy as np
+import pandas as pd
+from tqdm import tqdm
 from openai import OpenAI
+from bs4 import BeautifulSoup
+
+import psycopg2
+from psycopg2 import OperationalError, errorcodes
 
 # Load environment variables from .env file
 dotenv.load_dotenv()
-
 OPENAI_API_KEY = os.getenv('token')
 
-
-
+# 01 - Scraping
 
 def get_soup(url: str):
     """
@@ -227,4 +229,121 @@ def extract_info_ai(prod: str):
     except json.JSONDecodeError as e:
         print(e)
 
+    
+def change_id(df: pd.DataFrame, df_dict: pd.DataFrame, column: str):
+    """
+    Replaces the values in a specified column of a DataFrame with corresponding IDs from a reference dictionary DataFrame and renames the column.
 
+    Parameters:
+    - df (pd.DataFrame): The main DataFrame where values in the specified column will be changed to IDs.
+    - df_dict (pd.DataFrame): A reference DataFrame containing mapping data with columns for values and their corresponding IDs.
+    - column (str): The name of the column in both DataFrames that contains the values to be converted.
+
+    Returns:
+    - pd.DataFrame: The modified DataFrame with updated IDs and renamed column.
+    """
+
+    # Extract the id-value 
+    values = df_dict[column].to_dict()
+    ids = df_dict[f'{column}_id'].to_dict()
+    # Build a ditionary
+    dc = {values[i]: ids[i] for i in ids}
+    # Convert values to ids and rename column
+    df[column] = df[column].apply(lambda x: dc.get(x, np.nan))
+    df.rename(columns={column: f'{column}_id'}, inplace=True)
+
+    return df
+
+
+# 02 - PostgreSQL Database
+
+def table_creation(queries: list):
+    """
+    Creates tables in a PostgreSQL database by executing a series of SQL table creation queries.
+
+    Parameters:
+    - queries (list of str): List of SQL queries to execute, each defining a table structure.
+    """
+    # Set connection
+    try:
+        connection = psycopg2.connect(
+            database='supermarkets',
+            user='my_user',
+            password='admin',
+            host='localhost',
+            port='5432'
+        )
+
+        # Queries execution
+        with connection.cursor() as cursor:
+            for query in queries:
+                cursor.execute(query)
+        
+        # Commit the transaction
+        connection.commit()
+        print("Tables created successfully.")
+
+    except OperationalError as e:
+        if e.pgcode == errorcodes.INVALID_PASSWORD:
+            print('Incorrect password')
+        elif e.pgcode == errorcodes.CONNECTION_EXCEPTION:
+            print('Connection error')
+        elif e.pgcode == errorcodes.INVALID_CATALOG_NAME:
+            print('Database does not exist')
+        else:
+            print(f"Database error: {e}")
+            
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+
+    finally:
+        # Ensure connection closure
+        if connection:
+            connection.close()
+            print("Database connection closed.")
+
+
+def data_insertion(query: str, values: list):
+    """
+    Inserts multiple rows of data into a PostgreSQL database based on a specified query and values.
+
+    Parameters:
+    - query (str): SQL query to execute, typically an INSERT statement with placeholders for data.
+    - values (list of tuple): List of tuples containing values to insert, each tuple representing a row.
+    """
+    # Set connection
+    try:
+        connection = psycopg2.connect(
+            database='supermarkets',
+            user='my_user',
+            password='admin',
+            host='localhost',
+            port='5432'
+        )
+
+        # Queries execution
+        with connection.cursor() as cursor:
+            cursor.executemany(query, values)
+        
+        # Commit the transaction
+        connection.commit()
+        print("Data inserted successfully.")
+
+    except OperationalError as e:
+        if e.pgcode == errorcodes.INVALID_PASSWORD:
+            print('Incorrect password')
+        elif e.pgcode == errorcodes.CONNECTION_EXCEPTION:
+            print('Connection error')
+        elif e.pgcode == errorcodes.INVALID_CATALOG_NAME:
+            print('Database does not exist')
+        else:
+            print(f"Database error: {e}")
+            
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+
+    finally:
+        # Ensure connection closure
+        if connection:
+            connection.close()
+            print("Database connection closed.")
