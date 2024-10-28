@@ -1,5 +1,7 @@
 # 🛒 Supermarket Price Analysis Project
 
+![facua supermarkets](https://github.com/user-attachments/assets/94c04f0b-602a-484c-9889-73c542005257)
+
 ## 📜 Project Overview
 This project aims to use data scraping, processing, and analysis tools to gather information on products and prices from various supermarkets in Spain. The primary data source is the **FACUA: Supermarket Prices** website. With the collected data, we create an SQL database, perform exploratory data analysis (EDA), and generate visualizations to uncover trends and price variability between supermarkets.
 
